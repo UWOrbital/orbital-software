@@ -17,6 +17,7 @@ class AbstractWrapper(ABC, Generic[T, PK]):
     """
 
     model: type[T]
+    uneditable_fields: set[str] = {"id"}
 
     def get_all(self) -> list[T]:
         """
@@ -67,4 +68,34 @@ class AbstractWrapper(ABC, Generic[T, PK]):
                 raise ValueError(f"{self.model.__name__} with ID {obj_id} not found.")
             session.delete(obj)
             session.commit()
+            return obj
+
+    def update(self, obj_id: PK, data: dict[str, Any]) -> T:
+        """
+        Update data wrapper for the unspecified model
+
+        :param obj_id: PK of the model instance to be updated
+        :param data: dictionary of field names and new values
+        :return: the updated instance
+        """
+        with get_db_session() as session:
+            obj = session.get(self.model, obj_id)
+            if not obj:
+                raise ValueError(f"{self.model.__name__} with ID {obj_id} not found.")
+
+            for field, value in data.items():
+                if not hasattr(obj, field):
+                    raise ValueError(f"{self.model.__name__}, field {field} not found.")
+
+                if field in self.uneditable_fields:
+                    raise ValueError(f"{self.model.__name__}, field {field} is uneditable")
+
+                field_type = type(getattr(obj, field))
+                if not isinstance(value, field_type):
+                    raise TypeError(f"{self.model.__name__}, field {field} must be of type {field_type.__name__}")
+
+                setattr(obj, field, value)
+
+            session.commit()
+            session.refresh(obj)
             return obj
