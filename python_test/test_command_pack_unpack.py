@@ -1,4 +1,4 @@
-from interfaces.obc_gs_interface.commands import (
+from interfaces.obc_gs_interface.commands.python.command_factories import (
     CmdCallbackId,
     create_cmd_ping,
     create_cmd_rtc_sync,
