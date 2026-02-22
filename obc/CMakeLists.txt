@@ -1,5 +1,10 @@
 cmake_minimum_required(VERSION 3.15)
 
+if(APPLE)
+    find_library(COREFOUNDATION CoreFoundation)
+    find_library(IOKIT IOKit)
+endif()
+
 # Set default values for firmware build options
 include(${CMAKE_SOURCE_DIR}/cmake/obc_build_options.cmake)
 
@@ -35,8 +40,9 @@ add_link_options(-Wl,--defsym,CUSTOM_START_ADDRESS=${CUSTOM_START_ADDRESS})
 if(${CMAKE_BUILD_TYPE} MATCHES OBC)
     set(OUT_FILE_NAME OBC-firmware.out)
     set(BIN_FILE_NAME OBC-firmware.bin)
-  add_compile_options(-Werror) # TODO: Move this back to download_arm_toolchain once all examples warnings are fixed
-	add_executable(${OUT_FILE_NAME} app/app_main.c)
+    set(CRC_FILE_NAME OBC-firmware-crc.bin)
+    add_compile_options(-Werror) # TODO: Move this back to download_arm_toolchain once all examples warnings are fixed
+    add_executable(${OUT_FILE_NAME} app/app_main.c)
 elseif(${CMAKE_BUILD_TYPE} MATCHES Examples)
     set(OUT_FILE_NAME OBC-firmware-${EXAMPLE_TYPE}.out)
     set(BIN_FILE_NAME OBC-firmware-${EXAMPLE_TYPE}.bin)
@@ -80,6 +86,18 @@ endif()
 add_executable(OBC-bl.out)
 add_executable(debug-tool.out)
 
+# Mapping the board for metadata
+if (${BOARD_TYPE} MATCHES RM46_LAUNCHPAD)
+    set(BOARD_TYPE_TO_INT_MAP 0)
+elseif (${BOARD_TYPE} MATCHES OBC_REVISION_1)
+    set(BOARD_TYPE_TO_INT_MAP 1)
+elseif (${BOARD_TYPE} MATCHES OBC_REVISION_2)
+    set(BOARD_TYPE_TO_INT_MAP 2)
+# Add OBC_REVISION_3 or other boards above
+else()
+    message (FATAL_ERROR "BOARD NOT YET ADDED TO INT MAP FOR METADATA")
+endif()
+
 # Shared
 add_subdirectory(shared/config)
 add_subdirectory(shared/hal)
@@ -100,6 +118,7 @@ target_compile_options(${OUT_FILE_NAME} PRIVATE ${TARGET_OPTIMIZATION_FLAGS})
 
 target_compile_definitions(${OUT_FILE_NAME} PRIVATE
     ${BOARD_TYPE}
+    BOARD_ID=${BOARD_TYPE_TO_INT_MAP}
     LOG_DEFAULT_OUTPUT_LOCATION=${LOG_DEFAULT_OUTPUT_LOCATION}
     LOG_DEFAULT_LEVEL=${LOG_DEFAULT_LEVEL}
     LOG_DATE_TIME
@@ -164,7 +183,8 @@ add_dependencies(${OUT_FILE_NAME} generate-scheduler-config)
 string(CONCAT commentStr "Generating " ${BIN_FILE_NAME})
 add_custom_command(
     OUTPUT ${BIN_FILE_NAME}
-    COMMAND toolchain/bin/arm-none-eabi-objcopy -O binary --only-section=.intvecs
+    COMMAND toolchain/bin/arm-none-eabi-objcopy -O binary --only-section=.metadata
+                                                                     --only-section=.intvecs
                                                                      --only-section=.kernelTEXT
                                                                      --only-section=.text
                                                                      --only-section=.rodata
@@ -173,17 +193,39 @@ add_custom_command(
                                                                      --only-section=.init_array
                                                                      --only-section=.fini_array
                                                                      --only-section=.data
+                                                                     --only-section=.crc
                                                                      ${OUT_FILE_NAME} ${BIN_FILE_NAME}
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     DEPENDS ${OUT_FILE_NAME}
     COMMENT commentStr
 )
 
+
+
 add_custom_target(
-    OBC-firmware_bin
+    OBC_firmware-crc_bin
     ALL
     DEPENDS ${BIN_FILE_NAME}
 )
+
+# Find Python 3 interpreter
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+
+if(${CMAKE_BUILD_TYPE} MATCHES OBC)
+	add_custom_target(firmware_crc ALL
+			COMMAND "${Python3_EXECUTABLE}"
+			"${CMAKE_SOURCE_DIR}/obc/tools/python/append_crc.py"
+			"${CMAKE_BINARY_DIR}/${BIN_FILE_NAME}"
+			"${CMAKE_BINARY_DIR}/${CRC_FILE_NAME}"
+			DEPENDS "${CMAKE_BINARY_DIR}/${BIN_FILE_NAME}"
+			COMMENT "Generating ${CRC_FILE_NAME} with CRC32 appended"
+			VERBATIM
+	)
+
+endif()
+
+
+
 
 # Bootloader
 target_link_options(OBC-bl.out PRIVATE
@@ -197,6 +239,7 @@ target_compile_options(OBC-bl.out PRIVATE ${TARGET_OPTIMIZATION_FLAGS})
 
 target_compile_definitions(OBC-bl.out PRIVATE
     ${BOARD_TYPE}
+    BOARD_ID=${BOARD_TYPE_TO_INT_MAP}
     LOG_DEFAULT_OUTPUT_LOCATION=${LOG_DEFAULT_OUTPUT_LOCATION}
     LOG_DEFAULT_LEVEL=${LOG_DEFAULT_LEVEL}
     DEBUG=${DEBUG}
@@ -229,6 +272,7 @@ target_compile_options(debug-tool.out PRIVATE ${TARGET_OPTIMIZATION_FLAGS})
 
 target_compile_definitions(debug-tool.out PRIVATE
     ${BOARD_TYPE}
+    BOARD_ID=${BOARD_TYPE_TO_INT_MAP}
     LOG_DEFAULT_OUTPUT_LOCATION=${LOG_DEFAULT_OUTPUT_LOCATION}
     LOG_DEFAULT_LEVEL=${LOG_DEFAULT_LEVEL}
     LOG_DATE_TIME
@@ -257,18 +301,6 @@ target_link_libraries(debug-tool.out PRIVATE
     ${FREERTOS_LIB_OPTIMIZE}
     $<TARGET_OBJECTS:${FREERTOS_LIB_NO_OPTIMIZE}>
 )
-
-
-if (${BOARD_TYPE} MATCHES RM46_LAUNCHPAD)
-    set(BOARD_TYPE_TO_INT_MAP 0)
-elseif (${BOARD_TYPE} MATCHES OBC_REVISION_1)
-    set(BOARD_TYPE_TO_INT_MAP 1)
-elseif (${BOARD_TYPE} MATCHES OBC_REVISION_2)
-    set(BOARD_TYPE_TO_INT_MAP 2)
-# Add OBC_REVISION_3 or other boards above
-else()
-    message (FATAL_ERROR "BOARD NOT YET ADDED TO INT MAP FOR METADATA")
-endif()
 
 # Generate file with CMake metadata
 file(WRITE ${CMAKE_BINARY_DIR}/OBC-metadata.bin

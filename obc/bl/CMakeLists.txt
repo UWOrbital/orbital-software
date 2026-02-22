@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.15)
 
+# Optimize for code size
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Os")
+
 set(BL_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/bl_main.c
     ${CMAKE_CURRENT_SOURCE_DIR}/source/bl_flash.c
@@ -10,9 +13,11 @@ set(BL_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/F021_Flash_API/source/Fapi_UserDefinedFunctions.c
 
     ${CMAKE_SOURCE_DIR}/interfaces/obc_gs_interface/commands/obc_gs_command_pack.c
+    ${CMAKE_SOURCE_DIR}/interfaces/obc_gs_interface/commands/obc_gs_commands_response_pack.c
     ${CMAKE_SOURCE_DIR}/interfaces/obc_gs_interface/commands/obc_gs_command_unpack.c
     ${CMAKE_SOURCE_DIR}/interfaces/data_pack_unpack/data_pack_utils.c
     ${CMAKE_SOURCE_DIR}/interfaces/data_pack_unpack/data_unpack_utils.c
+    ${CMAKE_SOURCE_DIR}/interfaces/obc_gs_interface/common/obc_gs_crc.c
 )
 
 set(BL_INCLUDES
