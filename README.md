@@ -15,7 +15,7 @@ The UW Orbital Docs are a great source of codebase documentation. The site inclu
 
 You will find it most helpful to check out the setup guides, build tutorials, and style guides.
 
-Check out the site here: https://uworbital.github.io/OBC-firmware/
+Check out the site here: https://uworbital.github.io/docs/
 
 The documentation site now contains most of the information previously found in this README.
 
