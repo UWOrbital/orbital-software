@@ -88,6 +88,7 @@ obc_error_code_t applyCamPreviewConfig(void) {
   obc_error_code_t errCode;
   RETURN_AND_GIVE_IF_ERROR_CODE(camWriteSensorRegList16_8(getCamPreviewConfig(), PREVIEW_CONFIG_LEN), ov5642RegMutex);
 
+  xSemaphoreGive(ov5642RegMutex);
   return OBC_ERR_CODE_SUCCESS;
 }
 
@@ -99,6 +100,7 @@ obc_error_code_t applyCamCaptureConfig(void) {
   obc_error_code_t errCode;
   RETURN_AND_GIVE_IF_ERROR_CODE(camWriteSensorRegList16_8(getCamCaptureConfig(), JPEG_CONFIG_LEN), ov5642RegMutex);
 
+  xSemaphoreGive(ov5642RegMutex);
   return OBC_ERR_CODE_SUCCESS;
 }
 
@@ -111,6 +113,7 @@ obc_error_code_t applyCamResolutionConfig(void) {
   RETURN_AND_GIVE_IF_ERROR_CODE(camWriteSensorRegList16_8(getCamResolutionConfig(), RES_320_240_CONFIG_LEN),
                                 ov5642RegMutex);
 
+  xSemaphoreGive(ov5642RegMutex);
   return OBC_ERR_CODE_SUCCESS;
 }
 
