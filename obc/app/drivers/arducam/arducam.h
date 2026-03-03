@@ -9,26 +9,6 @@
 #include "obc_errors.h"
 #include "obc_logging.h"
 
-// Arduchip Constants
-#define MAX_FIFO_SIZE 0x7FFFFF  // 8MByte
-
-// Sensor Timing Control Masks
-#define HSYNC_ACTIVE_LOW_MASK (0x01U << 0)
-#define VSYNC_ACTIVE_LOW_MASK (0x01U << 1)
-#define PCLK_REVERSED_MASK (0x01U << 3)
-// FIFO Control Masks
-#define FIFO_CLEAR_CAPTURE_DONE_FLAG (0x01U << 0)
-#define FIFO_START_CAPTURE (0x01U << 1)
-#define FIFO_RESET_WRITE_PTR (0x01U << 4)
-#define FIFO_RESET_READ_PTR (0x01U << 5)
-// Sensor Control Masks
-#define SENSOR_RESET_MASK (0x01U << 0)
-#define SENSOR_STANDBY_MASK (0x01 << 1)
-#define SENSOR_POWER_EN_MASK (0x01U << 2)
-// Capture Status Masks
-#define STATUS_VSYNC_MASK (0x01U << 0)
-#define STATUS_CAPTURE_DONE_MASK (0x01 << 3)
-
 /**
  * @enum	camera_t
  * @brief	Primary or secondary camera.
@@ -82,23 +62,6 @@ obc_error_code_t arducamWriteTestReg(camera_id_t cameraID, uint8_t value);
  */
 obc_error_code_t arducamReadSensorPowerControlReg(camera_id_t cameraID, uint8_t* buffer);
 
-/**
- * @brief Read Arducam's Test Register
- *
- * @param cameraID Camera ID of camera
- * @param buffer 1 byte buffer to store value read.
- * @return Error code. OBC_ERR_CODE_SUCCESS if successful.
- */
-obc_error_code_t arducamReadTestReg(camera_id_t cameraID, uint8_t* buffer);
-
-/**
- * @brief Write a value to Arducam's Test Register
- *
- * @param cameraID Camera ID of camera
- * @param value 1 byte value to be written.
- * @return Error code. OBC_ERR_CODE_SUCCESS if successful.
- */
-obc_error_code_t arducamWriteTestReg(camera_id_t cameraID, uint8_t value);
 /**
  * @brief Read the size of the Write FIFO
  *

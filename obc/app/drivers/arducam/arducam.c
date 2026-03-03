@@ -7,8 +7,25 @@
 #include "spi.h"
 
 // Constants
-
 #define ARDUCAM_DELAY_2MS pdMS_TO_TICKS(2)
+#define MAX_FIFO_SIZE 0x7FFFFF  // 8MByte
+
+// Sensor Timing Control Masks
+#define HSYNC_ACTIVE_LOW_MASK (0x01U << 0)
+#define VSYNC_ACTIVE_LOW_MASK (0x01U << 1)
+#define PCLK_REVERSED_MASK (0x01U << 3)
+// FIFO Control Masks
+#define FIFO_CLEAR_CAPTURE_DONE_FLAG (0x01U << 0)
+#define FIFO_START_CAPTURE (0x01U << 1)
+#define FIFO_RESET_WRITE_PTR (0x01U << 4)
+#define FIFO_RESET_READ_PTR (0x01U << 5)
+// Sensor Control Masks
+#define SENSOR_RESET_MASK (0x01U << 0)
+#define SENSOR_STANDBY_MASK (0x01 << 1)
+#define SENSOR_POWER_EN_MASK (0x01U << 2)
+// Capture Status Masks
+#define STATUS_VSYNC_MASK (0x01U << 0)
+#define STATUS_CAPTURE_DONE_MASK (0x01 << 3)
 
 // Arduchip masks
 #define ARDUCAM_RESET_CPLD_MASK 0x80
@@ -38,7 +55,7 @@ typedef enum opcode {
   ARDUCAM_FIFO_SIZE_MIDDLE = 0x43,
   ARDUCAM_FIFO_SIZE_UPPER = 0x44,
   ARDUCAM_RESET_CPLD = 0x07,
-} opcode_t;
+} arducam_opcode_t;
 
 /**
  * @brief Resets arducam chip. Needed for some ARM architecture for SPI to work. IDK why this is not in the docs >:(
@@ -48,32 +65,6 @@ typedef enum opcode {
  * @return Error code. OBC_ERR_CODE_SUCCESS if successful.
  */
 static obc_error_code_t arducamResetCPLD(camera_id_t cameraID);
-
-/**
- * @brief Write a value to Arducam's Sensor Timing Control Register
- *        Bit[0] Hsync Polarity: 0 = Active High, 1 = Active Low;
- *        Bit[1] Vsync Polarity: 0 = Active High, 1 = Active Low;
- *        Bit[3] Sensor PCLK reverse: 0 = normal, 1 = reversed PCLK
- *
- * @param cameraID Camera ID of camera
- * @param value 1 byte value to be written.
- * @return Error code. OBC_ERR_CODE_SUCCESS if successful.
- */
-static obc_error_code_t arducamWriteSensorTimingControlReg(camera_id_t cameraID, uint8_t value);
-
-/**
- * @brief Write a value to Arducam's FIFO Control Register
- *        Write 1 to following bits to
- *        Bit[0]: clear FIFO write/capture done flag;
- *        Bit[1]: start capture;
- *        Bit[4]: reset FIFO write pointer;
- *        Bit[5]: reset FIFO read pointer
- *
- * @param cameraID Camera ID of camera
- * @param value 1 byte value to be written.
- * @return Error code. OBC_ERR_CODE_SUCCESS if successful.
- */
-static obc_error_code_t arducamWriteFIFOControlReg(camera_id_t cameraID, uint8_t value);
 
 /**
  * @brief Write a value to Arducam's Sensor Power Control Register
@@ -87,15 +78,6 @@ static obc_error_code_t arducamWriteFIFOControlReg(camera_id_t cameraID, uint8_t
  * @return Error code. OBC_ERR_CODE_SUCCESS if successful.
  */
 static obc_error_code_t arducamWriteSensorPowerControlReg(camera_id_t cameraID, uint8_t value);
-
-/**
- * @brief Read a byte from the Arducam FIFO
- *
- * @param cameraID Camera ID of camera
- * @param buffer 1 byte buffer to store value read.
- * @return Error code. OBC_ERR_CODE_SUCCESS if successful.
- */
-// static obc_error_code_t arducamReadFIFO(camera_id_t cameraID, uint8_t* buffer);
 
 /**
  * @brief Read bufferSize bytes from the Arducam FIFO
@@ -126,13 +108,13 @@ static obc_error_code_t arducamReadCaptureStatusReg(camera_id_t cameraID, uint8_
 static size_t bytesLeftInFIFO(camera_id_t cameraID);
 
 // CS assumed to be asserted
-static obc_error_code_t arducamTransmitOpcode(opcode_t opcode) {
+static obc_error_code_t arducamTransmitOpcode(arducam_opcode_t opcode) {
   obc_error_code_t errCode;
   LOG_IF_ERROR_CODE(spiTransmitByte(CAM_SPI_REG, &arducamSPIDataFmt, opcode));
   return errCode;
 }
 
-static obc_error_code_t arducamWriteRegister(camera_id_t cameraID, opcode_t opcode, uint8_t value) {
+static obc_error_code_t arducamWriteRegister(camera_id_t cameraID, arducam_opcode_t opcode, uint8_t value) {
   obc_error_code_t errCode;
   obc_error_code_t prevCode;
 
@@ -149,7 +131,7 @@ static obc_error_code_t arducamWriteRegister(camera_id_t cameraID, opcode_t opco
   return errCode;
 }
 
-static obc_error_code_t arducamReadRegister(camera_id_t cameraID, opcode_t opcode, uint8_t *buffer) {
+static obc_error_code_t arducamReadRegister(camera_id_t cameraID, arducam_opcode_t opcode, uint8_t *buffer) {
   obc_error_code_t errCode;
   obc_error_code_t prevCode;
   if (buffer == NULL) {
@@ -175,14 +157,6 @@ obc_error_code_t arducamReadTestReg(camera_id_t cameraID, uint8_t *buffer) {
 
 obc_error_code_t arducamWriteTestReg(camera_id_t cameraID, uint8_t value) {
   return arducamWriteRegister(cameraID, ARDUCAM_TEST_REG, value);
-}
-
-static obc_error_code_t arducamWriteSensorTimingControlReg(camera_id_t cameraID, uint8_t value) {
-  return arducamWriteRegister(cameraID, ARDUCAM_SENSOR_TIMING_CONTROL_REG, value);
-}
-
-static obc_error_code_t arducamWriteFIFOControlReg(camera_id_t cameraID, uint8_t value) {
-  return arducamWriteRegister(cameraID, ARDUCAM_FIFO_CONTROL_REG, value);
 }
 
 obc_error_code_t arducamReadSensorPowerControlReg(camera_id_t cameraID, uint8_t *buffer) {
@@ -263,7 +237,7 @@ obc_error_code_t initCamera(camera_id_t cameraID) {
   // Make sure sensor is powered and reset is not asserted (reset is active low).
   RETURN_IF_ERROR_CODE(arducamWriteSensorPowerControlReg(cameraID, SENSOR_POWER_EN_MASK | SENSOR_RESET_MASK));
   // Make sure sensor vsync timing is set to active low
-  RETURN_IF_ERROR_CODE(arducamWriteSensorTimingControlReg(cameraID, VSYNC_ACTIVE_LOW_MASK));
+  RETURN_IF_ERROR_CODE(arducamWriteRegister(cameraID, ARDUCAM_SENSOR_TIMING_CONTROL_REG, VSYNC_ACTIVE_LOW_MASK));
   return errCode;
 }
 
@@ -274,7 +248,8 @@ obc_error_code_t startImageCapture(camera_id_t cameraID) {
   RETURN_IF_ERROR_CODE(applyCamResolutionConfig());
 
   // Start capture
-  RETURN_IF_ERROR_CODE(arducamWriteFIFOControlReg(cameraID, FIFO_CLEAR_CAPTURE_DONE_FLAG | FIFO_START_CAPTURE));
+  RETURN_IF_ERROR_CODE(
+      arducamWriteRegister(cameraID, ARDUCAM_FIFO_CONTROL_REG, FIFO_CLEAR_CAPTURE_DONE_FLAG | FIFO_START_CAPTURE));
   totalBytesToRead[cameraID] = 0;
   FIFOReadPtr[cameraID] = 0;
   return errCode;
@@ -302,7 +277,6 @@ obc_error_code_t readImage(camera_id_t cameraID, uint8_t *buffer, size_t bufferL
     bytesToRead = bufferLen;
   }
 
-  *bytesRead = 0;
   RETURN_IF_ERROR_CODE(arducamBurstReadFIFO(cameraID, buffer, bytesToRead));
   *bytesRead = bytesToRead;
   FIFOReadPtr[cameraID] += bytesToRead;
