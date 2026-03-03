@@ -122,7 +122,7 @@ function Signup() {
   };
 
   return (
-    <div className="flex flex-col items-center min-h-screen overflow-y-auto px-4 py-8">
+    <div className="flex flex-col items-center justify-center min-h-screen overflow-y-auto px-4 py-8">
       <div className="w-full max-w-2xl bg-gray-900/50 backdrop-blur-sm rounded-lg p-8 border border-gray-700/50 my-8">
         {/* Rocket Icon */}
         <div className="flex justify-center mb-4">
