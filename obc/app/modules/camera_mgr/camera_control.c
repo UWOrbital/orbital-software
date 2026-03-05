@@ -1,9 +1,9 @@
 #include "camera_control.h"
-#include "tca9458a.h"
+
+#include <spi.h>
 
 obc_error_code_t selectCamera(camera_id_t cameraID) {
   // TODO: Validate I2C mux driver code and properly integrate with control code
-  // RETURN_IF_ERROR_CODE(tcaSelect((uint8_t) cameraID));
   return OBC_ERR_CODE_SUCCESS;
 }
 
