@@ -65,6 +65,7 @@ obc_error_code_t arducamReadSensorPowerControlReg(camera_id_t cameraID, uint8_t*
 /**
  * @brief Read the size of the Write FIFO
  *
+ * @param cameraID Camera ID of camera
  * @param fifoSize uint32_t buffer to store value
  * @return Error code. OBC_ERR_CODE_SUCCESS if successful.
  */
