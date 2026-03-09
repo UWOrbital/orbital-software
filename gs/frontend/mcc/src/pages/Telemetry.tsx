@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
     createColumnHelper,
     flexRender,
@@ -142,10 +142,14 @@ const columns = [
     }),
 ];
 
+
 function Telemetry() {
     const type: string = "< log >";
     const [sorting, setSorting] = useState<SortingState>([]);
-
+    const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+    const rowRefs = useRef<Map<number, HTMLTableRowElement>>(new Map());
+    const scrollRef = useRef<HTMLDivElement>(null);
+    
     const table = useReactTable({
         data,
         columns,
@@ -154,6 +158,30 @@ function Telemetry() {
         onSortingChange: setSorting,
         state: { sorting },
     });
+    
+    const rows = table.getRowModel().rows;
+    
+    useEffect(() => {
+        if (selectedIndex === null) return;
+        const row = rowRefs.current.get(selectedIndex);
+        const container = scrollRef.current;
+        if (!row || !container) return;
+
+        const rowTop = row.offsetTop;
+        const rowBottom = rowTop + row.offsetHeight;
+        const containerTop = container.scrollTop + container.offsetTop;
+        const visibleTop = container.scrollTop;
+        const visibleBottom = visibleTop + container.clientHeight;
+
+        // account for sticky thead height
+        const theadHeight = container.querySelector("thead")?.offsetHeight ?? 0;
+
+        if (rowTop < visibleTop + theadHeight) {
+            container.scrollTop = rowTop - theadHeight;
+        } else if (rowBottom > visibleBottom) {
+            container.scrollTop = rowBottom - container.clientHeight;
+        }
+    }, [selectedIndex]);
 
     return (
         <div>
@@ -165,17 +193,34 @@ function Telemetry() {
                     <span className="italic font-bold">{type}</span>
                 </div>
 
-                <div className="overflow-y-auto flex-1">
+                <div 
+                    ref={scrollRef}
+                    className="overflow-y-auto flex-1 outline-none"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                        if (e.key === "ArrowDown") {
+                            e.preventDefault();
+                            setSelectedIndex(prev =>
+                                prev === null ? 0 : Math.min(prev + 1, rows.length - 1)
+                            );
+                        } else if (e.key === "ArrowUp") {
+                            e.preventDefault();
+                            setSelectedIndex(prev =>
+                                prev === null ? 0 : Math.max(prev - 1, 0)
+                            );
+                        }
+                    }}
+                >
                     <table className="w-full">
                         <thead className="sticky top-0 bg-black z-10">
                             <tr className="flex flex-row border-b-2 border-[#898989] gap-2 text-center pb-1">
-                                <td className="flex flex-row justify-between pl-2 w-1/4">
+                                <td className="flex flex-row justify-between pl-2 w-1/2">
                                     {table.getFlatHeaders()
                                         .filter(header => ["type", "timestamp"].includes(header.id))
                                         .map(header => (
                                             <th
                                                 key={header.id}
-                                                className={`font-normal text-center ${header.column.getCanSort() ? "cursor-pointer select-none" : ""}`}
+                                                className={`font-normal text-center ${header.column.getCanSort() ? "cursor-pointer select-none" : ""} w-1/2`}
                                                 onClick={header.column.getToggleSortingHandler()}
                                             >
                                                 {flexRender(header.column.columnDef.header, header.getContext())}
@@ -199,12 +244,22 @@ function Telemetry() {
                         </thead>
                         <tbody>
                             {table.getRowModel().rows.map((row) => (
-                                <tr key={row.id} className="flex flex-row gap-2">
-                                    <td className="flex flex-row justify-between pl-2 w-1/4">
+                                <tr 
+                                    key={row.id}
+                                    ref={(el) => {
+                                        if (el) rowRefs.current.set(row.index, el);
+                                        else rowRefs.current.delete(row.index);
+                                    }}
+                                    className={`flex flex-row gap-2 cursor-pointer ${
+                                        selectedIndex === row.index ? "bg-white text-[#1C1F1B]" : ""
+                                    }`}
+                                    onClick={() => setSelectedIndex(row.index)}
+                                >
+                                    <td className="flex flex-row justify-between pl-2 w-1/2 text-center">
                                         {row.getVisibleCells()
                                             .filter(cell => ["type", "timestamp"].includes(cell.column.id))
                                             .map(cell => (
-                                                <span key={cell.id}>
+                                                <span key={cell.id} className="w-1/2">
                                                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                                                 </span>
                                             ))}
