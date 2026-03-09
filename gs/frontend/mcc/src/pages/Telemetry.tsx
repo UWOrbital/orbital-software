@@ -165,15 +165,15 @@ const columns = [
             );
         },
     }),
-    columnHelper.display({
-        id: "timestamp",
+    columnHelper.accessor("timestamp", {
         header: "Timestamp",
         cell: (info) => info.row.original.timestamp?.toLocaleString(),
+        sortingFn: "datetime",
     }),
-    columnHelper.display({
-        id: "value",
+    columnHelper.accessor("value", {
         header: "Value",
         cell: (info) => info.row.original.value,
+        sortingFn: "basic",
     }),
 ];
 
