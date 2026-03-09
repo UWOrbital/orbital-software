@@ -142,14 +142,13 @@ const columns = [
     }),
 ];
 
-
 function Telemetry() {
     const type: string = "< log >";
     const [sorting, setSorting] = useState<SortingState>([]);
-    const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
-    const rowRefs = useRef<Map<number, HTMLTableRowElement>>(new Map());
+    const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
+    const rowRefs = useRef<Map<string, HTMLTableRowElement>>(new Map());
     const scrollRef = useRef<HTMLDivElement>(null);
-    
+
     const table = useReactTable({
         data,
         columns,
@@ -158,22 +157,19 @@ function Telemetry() {
         onSortingChange: setSorting,
         state: { sorting },
     });
-    
+
     const rows = table.getRowModel().rows;
-    
+
     useEffect(() => {
-        if (selectedIndex === null) return;
-        const row = rowRefs.current.get(selectedIndex);
+        if (selectedRowId === null) return;
+        const row = rowRefs.current.get(selectedRowId);
         const container = scrollRef.current;
         if (!row || !container) return;
 
         const rowTop = row.offsetTop;
         const rowBottom = rowTop + row.offsetHeight;
-        const containerTop = container.scrollTop + container.offsetTop;
         const visibleTop = container.scrollTop;
         const visibleBottom = visibleTop + container.clientHeight;
-
-        // account for sticky thead height
         const theadHeight = container.querySelector("thead")?.offsetHeight ?? 0;
 
         if (rowTop < visibleTop + theadHeight) {
@@ -181,7 +177,7 @@ function Telemetry() {
         } else if (rowBottom > visibleBottom) {
             container.scrollTop = rowBottom - container.clientHeight;
         }
-    }, [selectedIndex]);
+    }, [selectedRowId]);
 
     return (
         <div>
@@ -193,21 +189,29 @@ function Telemetry() {
                     <span className="italic font-bold">{type}</span>
                 </div>
 
-                <div 
+                <div
                     ref={scrollRef}
                     className="overflow-y-auto flex-1 outline-none"
                     tabIndex={0}
                     onKeyDown={(e) => {
                         if (e.key === "ArrowDown") {
                             e.preventDefault();
-                            setSelectedIndex(prev =>
-                                prev === null ? 0 : Math.min(prev + 1, rows.length - 1)
-                            );
+                            if (selectedRowId === null) {
+                                setSelectedRowId(rows[0]?.id ?? null);
+                            } else {
+                                const currentIdx = rows.findIndex(r => r.id === selectedRowId);
+                                const next = rows[Math.min(currentIdx + 1, rows.length - 1)];
+                                setSelectedRowId(next?.id ?? null);
+                            }
                         } else if (e.key === "ArrowUp") {
                             e.preventDefault();
-                            setSelectedIndex(prev =>
-                                prev === null ? 0 : Math.max(prev - 1, 0)
-                            );
+                            if (selectedRowId === null) {
+                                setSelectedRowId(rows[0]?.id ?? null);
+                            } else {
+                                const currentIdx = rows.findIndex(r => r.id === selectedRowId);
+                                const prev = rows[Math.max(currentIdx - 1, 0)];
+                                setSelectedRowId(prev?.id ?? null);
+                            }
                         }
                     }}
                 >
@@ -220,7 +224,7 @@ function Telemetry() {
                                         .map(header => (
                                             <th
                                                 key={header.id}
-                                                className={`font-normal text-center ${header.column.getCanSort() ? "cursor-pointer select-none" : ""} w-1/2`}
+                                                className={`font-normal text-center w-1/2 ${header.column.getCanSort() ? "cursor-pointer select-none" : ""}`}
                                                 onClick={header.column.getToggleSortingHandler()}
                                             >
                                                 {flexRender(header.column.columnDef.header, header.getContext())}
@@ -243,17 +247,17 @@ function Telemetry() {
                             </tr>
                         </thead>
                         <tbody>
-                            {table.getRowModel().rows.map((row) => (
-                                <tr 
+                            {rows.map((row) => (
+                                <tr
                                     key={row.id}
                                     ref={(el) => {
-                                        if (el) rowRefs.current.set(row.index, el);
-                                        else rowRefs.current.delete(row.index);
+                                        if (el) rowRefs.current.set(row.id, el);
+                                        else rowRefs.current.delete(row.id);
                                     }}
                                     className={`flex flex-row gap-2 cursor-pointer ${
-                                        selectedIndex === row.index ? "bg-white text-[#1C1F1B]" : ""
+                                        selectedRowId === row.id ? "bg-white text-[#1C1F1B]" : ""
                                     }`}
-                                    onClick={() => setSelectedIndex(row.index)}
+                                    onClick={() => setSelectedRowId(row.id)}
                                 >
                                     <td className="flex flex-row justify-between pl-2 w-1/2 text-center">
                                         {row.getVisibleCells()
