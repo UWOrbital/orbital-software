@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from "react";
 import {
     createColumnHelper,
+    type ColumnFiltersState,
     type ExpandedState,
     flexRender,
     getCoreRowModel,
     getExpandedRowModel,
+    getFilteredRowModel,
     getSortedRowModel,
     type SortingState,
     useReactTable
@@ -12,7 +14,7 @@ import {
 
 type telemetryData = {
     type?: string,
-    timestamp?: Date,
+    timestamp?: string,
     value?: number,
     id?: number,
     session?: string,
@@ -125,18 +127,21 @@ const rawData = [
     { type: "adcsMagBoardTemp", timestamp: "2025-10-11 14:31:40", value: 19.8, subRows: [{ id: 1, session: "Session 9", packet: "0x2BE76A05", obc_state: "Sent", epc_state: "Failed" }] },
 ];
 
-const data: telemetryData[] = rawData.map(row => ({
-    ...row,
-    timestamp: new Date(row.timestamp),
-}));
+const uniqueTypes = Array.from(new Set(rawData.map(row => row.type))).sort();
+
+const data: telemetryData[] = rawData;
 
 const columnHelper = createColumnHelper<telemetryData>();
 
 const columns = [
-    columnHelper.display({
+    columnHelper.accessor("type", {
         id: "type",
         header: "Type",
         enableSorting: false,
+        filterFn: (row, _columnId, filterValue) => {
+            if (!filterValue) return true;
+            return row.original.type === filterValue;
+        },
         cell: (info) => {
             const row = info.row.original;
             const isChild = info.row.depth > 0;
@@ -159,13 +164,15 @@ const columns = [
                         <span className="w-3" />
                     )}
                     {isChild
-                        ? <div className="border-b-2 border-t-2 border-[#898989] py-2 text-left w-full">
-                            <p>ID: {row.id}</p>
-                            <p>{row.session}</p>
-                            <p>Packet: <span className="text-grey-400">{row.packet}</span></p>
-                            <p>OBC_State: <span className={statusColors[row.obc_state ?? ""] || "text-grey-400"}>{row.obc_state}</span></p>
-                            <p>EPS_State: <span className={statusColors[row.epc_state ?? ""] || "text-grey-400"}>{row.epc_state}</span></p>
-                        </div> 
+                        ? (
+                            <div className="border-b-2 border-t-2 border-[#898989] py-2 text-left w-full">
+                                <p>ID: {row.id}</p>
+                                <p>{row.session}</p>
+                                <p>Packet: {row.packet}</p>
+                                <p>OBC_State: <span className={statusColors[row.obc_state ?? ""] ?? "text-gray-400"}>{row.obc_state}</span></p>
+                                <p>EPS_State: <span className={statusColors[row.epc_state ?? ""] ?? "text-gray-400"}>{row.epc_state}</span></p>
+                            </div>
+                        )
                         : row.type}
                 </div>
             );
@@ -173,8 +180,8 @@ const columns = [
     }),
     columnHelper.accessor("timestamp", {
         header: "Timestamp",
-        cell: (info) => info.row.original.timestamp?.toLocaleString(),
-        sortingFn: "datetime",
+        cell: (info) => info.row.original.timestamp,
+        sortingFn: "alphanumeric",
     }),
     columnHelper.accessor("value", {
         header: "Value",
@@ -186,6 +193,8 @@ const columns = [
 function Telemetry() {
     const type: string = "< log >";
     const [sorting, setSorting] = useState<SortingState>([]);
+    const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+    const [globalFilter, setGlobalFilter] = useState("");
     const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
     const rowRefs = useRef<Map<string, HTMLTableRowElement>>(new Map());
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -194,13 +203,16 @@ function Telemetry() {
     const table = useReactTable({
         data,
         columns,
-        state: { sorting, expanded },
+        state: { sorting, expanded, columnFilters, globalFilter },
         onSortingChange: setSorting,
         onExpandedChange: setExpanded,
+        onColumnFiltersChange: setColumnFilters,
+        onGlobalFilterChange: setGlobalFilter,
         getSubRows: (row) => row.subRows,
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getExpandedRowModel: getExpandedRowModel(),
+        getFilteredRowModel: getFilteredRowModel(),
     });
 
     const rows = table.getRowModel().rows;
@@ -232,6 +244,27 @@ function Telemetry() {
             >
                 <div id="header" className="flex flex-row w-full gap-4 items-center">
                     <span className="italic font-bold">{type}</span>
+                </div>
+
+                {/* Search and Filter inputs */}
+                <div className="flex flex-row gap-2 py-1">
+                    <input
+                        type="text"
+                        placeholder="Search..."
+                        className="bg-transparent border border-[#898989] rounded px-2 py-1 text-sm outline-none flex-1"
+                        value={globalFilter}
+                        onChange={(e) => setGlobalFilter(e.target.value)}
+                    />
+                    <select
+                        className="bg-black border border-[#898989] rounded px-2 py-1 text-xs outline-none flex-1"
+                        value={(table.getColumn("type")?.getFilterValue() as string) ?? ""}
+                        onChange={(e) => table.getColumn("type")?.setFilterValue(e.target.value || undefined)}
+                    >
+                        <option value="">All types</option>
+                        {uniqueTypes.map(type => (
+                            <option key={type} value={type}>{type}</option>
+                        ))}
+                    </select>
                 </div>
 
                 <div
@@ -299,7 +332,7 @@ function Telemetry() {
                                         if (el) rowRefs.current.set(row.id, el);
                                         else rowRefs.current.delete(row.id);
                                     }}
-                                    className={`flex flex-row gap-2 py-1 cursor-pointer ${
+                                    className={`flex flex-row gap-2 cursor-pointer ${
                                         selectedRowId === row.id ? "bg-white text-[#1C1F1B]" : ""
                                     }`}
                                     onClick={() => setSelectedRowId(row.id)}
