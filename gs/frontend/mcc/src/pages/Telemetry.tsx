@@ -140,6 +140,12 @@ const columns = [
         cell: (info) => {
             const row = info.row.original;
             const isChild = info.row.depth > 0;
+            const statusColors: Record<string, string> = {
+                Pending: "text-yellow-400",
+                Sent: "text-green-400",
+                Received: "text-blue-400",
+                Failed: "text-red-400",
+            };
             return (
                 <div
                     style={{ paddingLeft: `${info.row.depth * 1}rem` }}
@@ -156,9 +162,9 @@ const columns = [
                         ? <div className="border-b-2 border-t-2 border-[#898989] py-2 text-left w-full">
                             <p>ID: {row.id}</p>
                             <p>{row.session}</p>
-                            <p>Packet: {row.packet}</p>
-                            <p>OBC_State: {row.obc_state}</p>
-                            <p>EPS_State: {row.epc_state}</p>
+                            <p>Packet: <span className="text-grey-400">{row.packet}</span></p>
+                            <p>OBC_State: <span className={statusColors[row.obc_state ?? ""] || "text-grey-400"}>{row.obc_state}</span></p>
+                            <p>EPS_State: <span className={statusColors[row.epc_state ?? ""] || "text-grey-400"}>{row.epc_state}</span></p>
                         </div> 
                         : row.type}
                 </div>
