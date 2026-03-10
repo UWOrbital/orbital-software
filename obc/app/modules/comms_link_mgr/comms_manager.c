@@ -62,11 +62,11 @@ static const uint8_t TEMP_STATIC_KEY[AES_KEY_SIZE] = {0x00, 0x01, 0x02, 0x03, 0x
                                                       0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F};
 
 #define CC1120_TEMP_QUEUE_LENGTH 1
-#define CC1120_TEMP_QUEUE_ITEM_SIZE sizeof(uint32_t)
+#define CC1120_TEMP_QUEUE_ITEM_SIZE sizeof(float)
 
 QueueHandle_t cc1120TempQueueHandle = NULL;
 static StaticQueue_t cc1120TempQueue;
-static uint8_t cc1120TempQueueStack[COMMS_MANAGER_QUEUE_LENGTH * CC1120_TEMP_QUEUE_ITEM_SIZE];
+static uint8_t cc1120TempQueueStack[CC1120_TEMP_QUEUE_LENGTH * CC1120_TEMP_QUEUE_ITEM_SIZE];
 
 /**
  * @brief determines what the next Comms Manager state should be and sets it to
@@ -320,7 +320,7 @@ obc_error_code_t sendToFrontCommsManagerQueue(comms_event_t *event) {
 }
 
 static obc_error_code_t postCommsManagerTempQueue() {
-  float value = 0.0f;  // dummy value, replace with actual temp reading function
+  float value = 0.0f;  // TODO: dummy value, replace with actual temp reading function
   if (xQueueOverwrite(cc1120TempQueueHandle, &value) != pdPASS) {
     return OBC_ERR_CODE_UNKNOWN;
   }

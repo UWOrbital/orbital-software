@@ -16,7 +16,7 @@
 #define LOCAL_TIME_SYNC_PERIOD_S 60UL
 
 #define RTC_TEMP_QUEUE_LENGTH 1
-#define RTC_TEMP_QUEUE_ITEM_SIZE sizeof(uint32_t)
+#define RTC_TEMP_QUEUE_ITEM_SIZE sizeof(float)
 
 QueueHandle_t rtcTempQueueHandle = NULL;
 static StaticQueue_t rtcTempQueue;
@@ -30,7 +30,6 @@ static uint8_t rtcTempQueueStack[RTC_TEMP_QUEUE_LENGTH * RTC_TEMP_QUEUE_ITEM_SIZ
 static obc_error_code_t postRtcTempQueue();
 
 void obcTaskInitTimekeeper(void) {
-  ASSERT((rtcTempQueueStack != NULL) && (&rtcTempQueue != NULL));
   if (rtcTempQueueHandle == NULL) {
     rtcTempQueueHandle =
         xQueueCreateStatic(RTC_TEMP_QUEUE_LENGTH, RTC_TEMP_QUEUE_ITEM_SIZE, rtcTempQueueStack, &rtcTempQueue);
@@ -86,7 +85,7 @@ void obcTaskFunctionTimekeeper(void *pvParameters) {
 
     // Post temperature into mailbox queue
 
-    postRtcTempQueue();
+    LOG_IF_ERROR_CODE(postRtcTempQueue());
 
     // Send Unix time to frame
     unixTime.unixTime = getCurrentUnixTime();
