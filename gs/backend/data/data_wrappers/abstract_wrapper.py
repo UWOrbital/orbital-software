@@ -79,9 +79,7 @@ class AbstractWrapper(ABC, Generic[T, PK]):
         :return: the updated instance
         """
         with get_db_session() as session:
-            obj = session.get(self.model, obj_id)
-            if not obj:
-                raise ValueError(f"{self.model.__name__} with ID {obj_id} not found.")
+            obj = self.get_by_id(obj_id)
 
             for field, value in data.items():
                 if not hasattr(obj, field):
@@ -90,12 +88,17 @@ class AbstractWrapper(ABC, Generic[T, PK]):
                 if field in self.uneditable_fields:
                     raise ValueError(f"{self.model.__name__}, field {field} is uneditable")
 
-                field_type = type(getattr(obj, field))
-                if not isinstance(value, field_type):
-                    raise TypeError(f"{self.model.__name__}, field {field} must be of type {field_type.__name__}")
+                current_value = getattr(obj, field)
 
-                setattr(obj, field, value)
+                if current_value and value:
+                    field_type = type(current_value)
+                    if not isinstance(value, field_type):
+                        raise TypeError(f"{self.model.__name__}, field {field} must be of type {field_type.__name__}")
+
+                try:
+                    setattr(obj, field, value)
+                except Exception as e:
+                    raise RuntimeError(f"Failed to update {self.model.__name__}: {e}") from e
 
             session.commit()
-            session.refresh(obj)
             return obj
