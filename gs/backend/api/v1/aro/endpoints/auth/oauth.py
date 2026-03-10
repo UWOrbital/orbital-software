@@ -186,7 +186,22 @@ async def logout(token: str) -> dict[str, str]:
 
 @router.post("/verifycs", response_model=UserResponse)
 async def verify_callsign(request: CallsignRequest, user: AROUsers = Depends(get_current_user)) -> UserResponse:
-    user = verify_user_callsign(request.call_sign, user)
+    """
+    verify_callsign
+
+    The final step in authentication.
+    Verifies a user's callsign and grants them admin access.
+    """
+    user = verify_user_callsign(
+        request.call_sign, 
+        request.qual_level_a,
+        request.qual_level_b,
+        request.qual_level_c,
+        request.qual_level_d,
+        request.qual_level_e,
+        user,
+    )
+    
     return UserResponse(
         id=user.id,
         email=user.email,

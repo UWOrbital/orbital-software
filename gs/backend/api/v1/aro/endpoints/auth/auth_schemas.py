@@ -73,4 +73,17 @@ class UserResponse(BaseModel):
         from_attributes = True
 
 class CallsignRequest(BaseModel):
+    """
+    CallsignRequest
+
+    Response containing callsign data of a user.
+
+    
+    """
     call_sign: str
+    qual_level_a: str
+    qual_level_b: str
+    qual_level_c: str
+    qual_level_d: str
+    qual_level_e: str
+
