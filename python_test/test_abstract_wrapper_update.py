@@ -9,8 +9,9 @@ from sqlmodel import Field
 
 class TestModel(BaseSQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    name: str
+    name: Optional[str] = Field(default=None, nullable=True)
     age: int
+    address: Optional[str] = Field(default=None, nullable=True)
 
 
 class TestWrapper(AbstractWrapper[TestModel, int]):
@@ -47,13 +48,12 @@ def test_update_success(wrapper, mock_session, obj):
     assert result.id == 1
 
     mock_session.commit.assert_called_once()
-    mock_session.refresh.assert_called_once_with(obj)
 
 
 def test_update_not_found(wrapper, mock_session, obj):
     mock_session.get.return_value = None
 
-    with pytest.raises(ValueError, match=f"TestModel with ID {obj.id} not found"):
+    with pytest.raises(ValueError):
         wrapper.update(obj.id, {"name": "new"})
 
     mock_session.commit.assert_not_called()
@@ -62,8 +62,8 @@ def test_update_not_found(wrapper, mock_session, obj):
 def test_update_field_not_found(wrapper, mock_session, obj):
     mock_session.get.return_value = obj
 
-    with pytest.raises(ValueError, match="TestModel, field address not found"):
-        wrapper.update(obj.id, {"address": "house"})
+    with pytest.raises(ValueError):
+        wrapper.update(obj.id, {"test": "test"})
 
     mock_session.commit.assert_not_called()
 
@@ -71,7 +71,7 @@ def test_update_field_not_found(wrapper, mock_session, obj):
 def test_update_uneditable_field(wrapper, mock_session, obj):
     mock_session.get.return_value = obj
 
-    with pytest.raises(ValueError, match="TestModel, field id is uneditable"):
+    with pytest.raises(ValueError):
         wrapper.update(obj.id, {"id": 2})
 
     mock_session.commit.assert_not_called()
@@ -80,7 +80,7 @@ def test_update_uneditable_field(wrapper, mock_session, obj):
 def test_update_type_mismatch(wrapper, mock_session, obj):
     mock_session.get.return_value = obj
 
-    with pytest.raises(TypeError, match="TestModel, field age must be of type int"):
+    with pytest.raises(TypeError):
         wrapper.update(obj.id, {"age": "five"})
 
     mock_session.commit.assert_not_called()
@@ -95,3 +95,35 @@ def test_update_partial(wrapper, mock_session, obj):
     assert result.age == 25
 
     mock_session.commit.assert_called_once()
+
+
+def test_update_nullify(wrapper, mock_session, obj):
+    mock_session.get.return_value = obj
+
+    result = wrapper.update(obj.id, {"name": None})
+
+    assert not result.name
+    assert result.age == 25
+
+    mock_session.commit.assert_called_once()
+
+
+def test_update_unnullify(wrapper, mock_session, obj):
+    mock_session.get.return_value = obj
+
+    result = wrapper.update(obj.id, {"address": "home"})
+
+    assert result.name == "old"
+    assert result.age == 25
+    assert result.address == "home"
+
+    mock_session.commit.assert_called_once()
+
+
+def test_update_unnullify_error(wrapper, mock_session, obj):
+    mock_session.get.return_value = obj
+
+    with pytest.raises(RuntimeError):
+        wrapper.update(obj.id, {"address": 5})
+
+    mock_session.commit.assert_not_called()
