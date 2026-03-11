@@ -17,11 +17,14 @@
 #include <stdio.h>
 
 #define UART_MUTEX_BLOCK_TIME portMAX_DELAY
-#define BUFFER_SIZE 512U
+// BUFFER_SIZE must be a multiple of 3 for base64 conversion
+#define BUFFER_SIZE 4095U
 
 #define TASK_STACK_SIZE 2048U
 static StaticTask_t taskBuffer;
 static StackType_t taskStack[TASK_STACK_SIZE];
+
+const char b64chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 void vTask1(void *pvParameters) {
   obc_error_code_t errCode;
@@ -48,7 +51,7 @@ void vTask1(void *pvParameters) {
   // Camera Configuration
   sciPrintf("Configuring Camera\r\n");
   LOG_IF_ERROR_CODE(camConfigureSensor());
-  for (int i = 0; i < 10; i++) {
+  for (int i = 0; i < 20; i++) {
     // Capture
     sciPrintf("Starting Image Capture\r\n");
     LOG_IF_ERROR_CODE(startImageCapture(selectedCamera));
@@ -67,13 +70,32 @@ void vTask1(void *pvParameters) {
     uint8_t imgBuffer[BUFFER_SIZE];
     sciPrintf("FIFO Burst Read:\r\n");
     size_t bytesRead = 0;
-    obc_error_code_t ret;
-    do {
-      ret = readImage(selectedCamera, imgBuffer, BUFFER_SIZE, &bytesRead);
-      for (size_t index = 0; index < bytesRead; index++) {
-        sciPrintf("0x%X,", imgBuffer[index]);
-      }
-    } while (ret == OBC_ERR_CODE_CAMERA_IMAGE_READ_INCOMPLETE);
+    // Only print last image
+    if (i == 19) {
+      obc_error_code_t ret;
+      do {
+        ret = readImage(selectedCamera, imgBuffer, BUFFER_SIZE, &bytesRead);
+        for (size_t i = 0; i < bytesRead; i += 3) {
+          // modified from https://nachtimwald.com/2017/11/18/base64-encode-and-decode-in-c/
+          uint32_t v = imgBuffer[i];
+          v = i + 1 < bytesRead ? v << 8 | imgBuffer[i + 1] : v << 8;
+          v = i + 2 < bytesRead ? v << 8 | imgBuffer[i + 2] : v << 8;
+
+          sciPrintf("%c", b64chars[(v >> 18) & 0x3F]);
+          sciPrintf("%c", b64chars[(v >> 12) & 0x3F]);
+          if (i + 1 < bytesRead) {
+            sciPrintf("%c", b64chars[(v >> 6) & 0x3F]);
+          } else {
+            sciPrintf("=");
+          }
+          if (i + 2 < bytesRead) {
+            sciPrintf("%c", b64chars[v & 0x3F]);
+          } else {
+            sciPrintf("=");
+          }
+        }
+      } while (ret == OBC_ERR_CODE_CAMERA_IMAGE_READ_INCOMPLETE);
+    }
     sciPrintf("\r\n");
   }
 
