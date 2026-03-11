@@ -1,8 +1,7 @@
 from typing import Any
 
-from pydantic import ConfigDict
 from sqlmodel import SQLModel
-from sqlmodel._compat import get_config_value, set_config_value
+from sqlmodel._compat import SQLModelConfig, get_config_value, set_config_value
 
 
 class BaseSQLModel(SQLModel):
@@ -10,7 +9,7 @@ class BaseSQLModel(SQLModel):
     Base SQL Model class. It performs validation on the model unlike the default SQLModel class with table=True.
     """
 
-    model_config = ConfigDict(validate_assignment=True)
+    model_config = SQLModelConfig(validate_assignment=True)
 
     def __init__(self, **data: dict[str, Any]) -> None:
         is_table = get_config_value(model=self, parameter="table", default=False)
