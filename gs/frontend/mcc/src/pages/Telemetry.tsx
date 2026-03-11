@@ -140,6 +140,7 @@ const columns = [
         enableSorting: false,
         filterFn: (row, _columnId, filterValue) => {
             if (!filterValue) return true;
+            if (row.depth > 0) return true;
             return row.original.type === filterValue;
         },
         cell: (info) => {
@@ -213,6 +214,18 @@ function Telemetry() {
         getSortedRowModel: getSortedRowModel(),
         getExpandedRowModel: getExpandedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
+        globalFilterFn: (row, _columnId, filterValue) => {
+            const search = (filterValue as string).toLowerCase();
+
+            const matchesRow = (r: telemetryData): boolean => {
+                return [
+                    r.type, r.timestamp, String(r.value ?? ""),
+                    r.session, r.packet, r.obc_state, r.epc_state, String(r.id ?? "")
+                ].some(val => val?.toLowerCase().includes(search));
+            };
+
+            return matchesRow(row.original) || (row.original.subRows?.some(matchesRow) ?? false);
+        },
     });
 
     const rows = table.getRowModel().rows;
